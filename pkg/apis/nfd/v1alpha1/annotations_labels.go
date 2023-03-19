@@ -52,4 +52,8 @@ const (
 	// set this label and consumers of the objects are supposed to use the
 	// label for filtering features designated for a certain node.
 	NodeFeatureObjNodeNameLabel = "nfd.node.kubernetes.io/node-name"
+
+	FeatureAnnotationNs = "feature.node.kubernetes.io"
+
+	FeatureAnnotationNsSuffix = "." + FeatureAnnotationNs
 )

@@ -130,6 +130,8 @@ spec:
     - name: "my sample rule"
       labels:
         "my-sample-feature": "true"
+      annotations:
+        "my-sample-feature": "true"
       matchFeatures:
         - feature: kernel.loadedmodule
           matchExpressions:
@@ -139,7 +141,7 @@ spec:
             X86: {op: In, value: ["y"]}
 ```
 
-It specifies one rule which creates node label
+It specifies one rule which creates node label ande annotations
 `feature.node.kubenernetes.io/my-sample-feature=true` if both of the following
 conditions are true (`matchFeatures` implements a logical AND over the
 matchers):
@@ -474,6 +476,10 @@ details.
 **NOTE** The `labels` field has priority over `labelsTemplate`, i.e.
 labels specified in the `labels` field will override anything
 originating from `labelsTemplate`.
+
+### Annotations
+
+The `.annotations` is a map of the node annotations to create if the rule matches.
 
 ### Taints
 

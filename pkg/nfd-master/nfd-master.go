@@ -457,6 +457,31 @@ func (m *nfdMaster) filterFeatureLabels(labels Labels) (Labels, ExtendedResource
 	return outLabels, extendedResources
 }
 
+// Filter annotations by namespace. i.e. adds the possibly missing default namespace for annotations
+// arriving through the gRPC API.
+func (m *nfdMaster) filterFeatureAnnotations(annotations map[string]string) map[string]string {
+	outAnnotations := make(map[string]string)
+
+	for annotation, value := range annotations {
+		// Add possibly missing default ns
+		annotation := addNs(annotation, nfdv1alpha1.FeatureAnnotationNs)
+
+		ns, _ := splitNs(annotation)
+
+		// Check annotation namespace, filter out if ns is not whitelisted
+		if ns != nfdv1alpha1.FeatureAnnotationNs && !strings.HasSuffix(ns, nfdv1alpha1.FeatureAnnotationNsSuffix) {
+			// If the namespace is denied, and not present in the extraLabelNs, label will be ignored
+			if isNamespaceDenied(ns, m.deniedNs.wildcard, m.deniedNs.normal) || ns == nfdv1alpha1.AnnotationNs {
+				klog.Errorf("Namespace %q is not allowed. Ignoring label %q\n", ns, annotation)
+				continue
+			}
+		}
+
+		outAnnotations[annotation] = value
+	}
+	return outAnnotations
+}
+
 func verifyNodeName(cert *x509.Certificate, nodeName string) error {
 	if cert.Subject.CommonName == nodeName {
 		return nil
@@ -610,14 +635,24 @@ func (m *nfdMaster) refreshNodeFeatures(cli *kubernetes.Clientset, nodeName stri
 		labels = make(map[string]string)
 	}
 
-	crLabels, crTaints := m.processNodeFeatureRule(features)
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	crLabels, crAnnotations, crTaints := m.processNodeFeatureRule(features)
 
 	// Mix in CR-originated labels
 	for k, v := range crLabels {
 		labels[k] = v
 	}
 
+	for k, v := range crAnnotations {
+		annotations[k] = v
+	}
+
 	labels, extendedResources := m.filterFeatureLabels(labels)
+
+	annotations = m.filterFeatureAnnotations(annotations)
 
 	var taints []corev1.Taint
 	if m.args.EnableTaints {
@@ -738,12 +773,13 @@ func authorizeClient(c context.Context, checkNodeName bool, nodeName string) err
 	return nil
 }
 
-func (m *nfdMaster) processNodeFeatureRule(features *nfdv1alpha1.Features) (map[string]string, []corev1.Taint) {
+func (m *nfdMaster) processNodeFeatureRule(features *nfdv1alpha1.Features) (map[string]string, map[string]string, []corev1.Taint) {
 	if m.nfdController == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	labels := make(map[string]string)
+	annotations := make(map[string]string)
 	var taints []corev1.Taint
 	ruleSpecs, err := m.nfdController.ruleLister.List(label.Everything())
 	sort.Slice(ruleSpecs, func(i, j int) bool {
@@ -752,7 +788,7 @@ func (m *nfdMaster) processNodeFeatureRule(features *nfdv1alpha1.Features) (map[
 
 	if err != nil {
 		klog.Errorf("failed to list NodeFeatureRule resources: %v", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// Process all rule CRs
@@ -774,6 +810,9 @@ func (m *nfdMaster) processNodeFeatureRule(features *nfdv1alpha1.Features) (map[
 			for k, v := range ruleOut.Labels {
 				labels[k] = v
 			}
+			for k, v := range ruleOut.Annotations {
+				annotations[k] = v
+			}
 
 			// Feed back rule output to features map for subsequent rules to match
 			features.InsertAttributeFeatures(nfdv1alpha1.RuleBackrefDomain, nfdv1alpha1.RuleBackrefFeature, ruleOut.Labels)
@@ -781,7 +820,7 @@ func (m *nfdMaster) processNodeFeatureRule(features *nfdv1alpha1.Features) (map[
 		}
 	}
 
-	return labels, taints
+	return labels, annotations, taints
 }
 
 // updateNodeObject ensures the Kubernetes node object is up to date,

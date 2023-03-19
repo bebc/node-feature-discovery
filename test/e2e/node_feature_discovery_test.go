@@ -718,6 +718,25 @@ core:
 						nodes,
 					)).NotTo(HaveOccurred())
 
+					By("Creating NodeFeatureRules #4")
+					Expect(testutils.CreateNodeFeatureRulesFromFile(nfdClient, "nodefeaturerule-4.yaml")).NotTo(HaveOccurred())
+
+					// Add features from NodeFeatureRule #4
+					expectedAnnotations := map[string]k8sAnnotations{
+						"*": {
+							nfdv1alpha1.FeatureAnnotationNs + "/e2e-flag-test-1":      "true",
+							nfdv1alpha1.FeatureAnnotationNs + "/e2e-attribute-test-1": "true",
+							nfdv1alpha1.FeatureAnnotationNs + "/e2e-instance-test-1":  "true",
+						},
+					}
+
+					By("Verifying node annotations from NodeFeatureRules #4")
+					Expect(checkForNodeAnnotations(
+						f.ClientSet,
+						expectedAnnotations,
+						nodes,
+					)).NotTo(HaveOccurred())
+
 					// Add features from NodeFeatureRule #3
 					By("Creating NodeFeatureRules #3")
 					Expect(testutils.CreateNodeFeatureRulesFromFile(nfdClient, "nodefeaturerule-3.yaml")).NotTo(HaveOccurred())
@@ -815,6 +834,8 @@ func waitForNfdNodeAnnotations(cli clientset.Interface, expected map[string]stri
 
 type k8sLabels map[string]string
 
+type k8sAnnotations map[string]string
+
 // checkForNfdNodeLabels waits and checks that node is labeled as expected.
 func checkForNodeLabels(cli clientset.Interface, expectedNewLabels map[string]k8sLabels, oldNodes []corev1.Node) error {
 
@@ -838,6 +859,45 @@ func checkForNodeLabels(cli clientset.Interface, expectedNewLabels map[string]k8
 
 			if !cmp.Equal(node.Labels, expectedNewLabels) {
 				return fmt.Errorf("node %q labels do not match expected, diff (expected vs. received): %s", node.Name, cmp.Diff(expectedNewLabels, node.Labels))
+			}
+		}
+		return nil
+	}
+
+	// Simple and stupid re-try loop
+	var err error
+	for retry := 0; retry < 3; retry++ {
+		if err = poll(); err == nil {
+			return nil
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return err
+}
+
+// checkForNfdNodeAnnotations waits and checks that node is annotated as expected.
+func checkForNodeAnnotations(cli clientset.Interface, expectedNewAnnotations map[string]k8sAnnotations, oldNodes []corev1.Node) error {
+
+	poll := func() error {
+		nodes, err := getNonControlPlaneNodes(cli)
+		if err != nil {
+			return err
+		}
+		for _, node := range nodes {
+			nodeExpected, ok := expectedNewAnnotations[node.Name]
+			if !ok {
+				nodeExpected = k8sAnnotations{}
+				if defaultExpected, ok := expectedNewAnnotations["*"]; ok {
+					nodeExpected = defaultExpected
+				}
+			}
+
+			oldAnnotations := getNodeAnnotations(oldNodes, node.Name)
+			expectedNewAnnotations := maps.Clone(oldAnnotations)
+			maps.Copy(expectedNewAnnotations, nodeExpected)
+
+			if !cmp.Equal(node.Annotations, expectedNewAnnotations) {
+				return fmt.Errorf("node %q annotations do not match expected, diff (expected vs. received): %s", node.Name, cmp.Diff(expectedNewAnnotations, node.Annotations))
 			}
 		}
 		return nil
@@ -927,6 +987,15 @@ func getNodeLabels(nodes []corev1.Node, nodeName string) map[string]string {
 	for _, node := range nodes {
 		if node.Name == nodeName {
 			return node.Labels
+		}
+	}
+	return nil
+}
+
+func getNodeAnnotations(nodes []corev1.Node, nodeName string) map[string]string {
+	for _, node := range nodes {
+		if node.Name == nodeName {
+			return node.Annotations
 		}
 	}
 	return nil
