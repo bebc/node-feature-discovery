@@ -32,12 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/yaml"
+
 	"sigs.k8s.io/node-feature-discovery/pkg/apihelper"
 	nfdv1alpha1 "sigs.k8s.io/node-feature-discovery/pkg/apis/nfd/v1alpha1"
 	"sigs.k8s.io/node-feature-discovery/pkg/labeler"
 	"sigs.k8s.io/node-feature-discovery/pkg/utils"
 	"sigs.k8s.io/node-feature-discovery/pkg/version"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -83,6 +84,12 @@ func TestUpdateNodeObject(t *testing.T) {
 		}
 		sort.Strings(fakeExtResourceNames)
 
+		fakeFeatureAnnotationNames := make([]string, 0, len(fakeAnnotations))
+		for k := range fakeAnnotations {
+			fakeFeatureAnnotationNames = append(fakeFeatureAnnotationNames, strings.TrimPrefix(k, nfdv1alpha1.FeatureAnnotationNs+"/"))
+		}
+		sort.Strings(fakeFeatureAnnotationNames)
+
 		mockAPIHelper := new(apihelper.MockAPIHelpers)
 		mockMaster := newMockMaster(mockAPIHelper)
 		mockClient := &k8sclient.Clientset{}
@@ -96,6 +103,7 @@ func TestUpdateNodeObject(t *testing.T) {
 			metadataPatches := []apihelper.JsonPatch{
 				apihelper.NewJsonPatch("replace", "/metadata/annotations", nfdv1alpha1.AnnotationNs+"/feature-labels", strings.Join(fakeFeatureLabelNames, ",")),
 				apihelper.NewJsonPatch("add", "/metadata/annotations", nfdv1alpha1.AnnotationNs+"/extended-resources", strings.Join(fakeExtResourceNames, ",")),
+				apihelper.NewJsonPatch("add", "/metadata/annotations", nfdv1alpha1.AnnotationNs+"/feature-annotations", strings.Join(fakeFeatureAnnotationNames, ",")),
 				apihelper.NewJsonPatch("remove", "/metadata/labels", nfdv1alpha1.FeatureLabelNs+"/old-feature", ""),
 			}
 			for k, v := range fakeFeatureLabels {

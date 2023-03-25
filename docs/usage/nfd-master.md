@@ -10,8 +10,8 @@ sort: 3
 ---
 
 NFD-Master is responsible for connecting to the Kubernetes API server and
-updating node objects. More specifically, it modifies node labels, taints and
-extended resources based on requests from nfd-workers and 3rd party extensions.
+updating node objects. More specifically, it modifies node labels, annotations,
+taints and extended resources based on requests from nfd-workers and 3rd party extensions.
 
 ## NodeFeature controller
 

@@ -131,7 +131,7 @@ spec:
       labels:
         "my-sample-feature": "true"
       annotations:
-        "my-sample-feature": "true"
+        "my-sample-feature-annotation": "test"
       matchFeatures:
         - feature: kernel.loadedmodule
           matchExpressions:

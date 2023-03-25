@@ -696,10 +696,23 @@ core:
 					By("Creating NodeFeatureRules #1")
 					Expect(testutils.CreateNodeFeatureRulesFromFile(nfdClient, "nodefeaturerule-1.yaml")).NotTo(HaveOccurred())
 
-					By("Verifying node labels from NodeFeatureRules #1")
+					By("Verifying node labels and annotations from NodeFeatureRules #1")
+					expectedAnnotations := map[string]k8sAnnotations{
+						"*": {
+							nfdv1alpha1.FeatureLabelNs + "defaul-ns-annotation":   "foo",
+							nfdv1alpha1.FeatureLabelNs + "defaul-ns-annotation-2": "bar",
+							"vendor.example/feature":                              "baz",
+						},
+					}
 					Expect(checkForNodeLabels(
 						f.ClientSet,
 						expected,
+						nodes,
+					)).NotTo(HaveOccurred())
+
+					Expect(checkForNodeAnnotations(
+						f.ClientSet,
+						expectedAnnotations,
 						nodes,
 					)).NotTo(HaveOccurred())
 
@@ -715,25 +728,6 @@ core:
 					Expect(checkForNodeLabels(
 						f.ClientSet,
 						expected,
-						nodes,
-					)).NotTo(HaveOccurred())
-
-					By("Creating NodeFeatureRules #4")
-					Expect(testutils.CreateNodeFeatureRulesFromFile(nfdClient, "nodefeaturerule-4.yaml")).NotTo(HaveOccurred())
-
-					// Add features from NodeFeatureRule #4
-					expectedAnnotations := map[string]k8sAnnotations{
-						"*": {
-							nfdv1alpha1.FeatureAnnotationNs + "/e2e-flag-test-1":      "true",
-							nfdv1alpha1.FeatureAnnotationNs + "/e2e-attribute-test-1": "true",
-							nfdv1alpha1.FeatureAnnotationNs + "/e2e-instance-test-1":  "true",
-						},
-					}
-
-					By("Verifying node annotations from NodeFeatureRules #4")
-					Expect(checkForNodeAnnotations(
-						f.ClientSet,
-						expectedAnnotations,
 						nodes,
 					)).NotTo(HaveOccurred())
 

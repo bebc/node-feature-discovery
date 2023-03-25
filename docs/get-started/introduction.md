@@ -17,7 +17,7 @@ sort: 1
 
 This software enables node feature discovery for Kubernetes. It detects
 hardware features available on each node in a Kubernetes cluster, and
-advertises those features using node labels and optionally node taints.
+advertises those features using node labels, annotations and optionally node taints.
 
 NFD consists of four software components:
 
@@ -72,12 +72,12 @@ Feature discovery is divided into domain-specific feature sources:
 - Local (hooks for user-specific features)
 
 Each feature source is responsible for detecting a set of features which. in
-turn, are turned into node feature labels.  Feature labels are prefixed with
-`feature.node.kubernetes.io/` and also contain the name of the feature source.
+turn, are turned into node feature labels and annotations.  Feature labels are prefixed
+with `feature.node.kubernetes.io/` and also contain the name of the feature source.
 Non-standard user-specific feature labels can be created with the local and
 custom feature sources.
 
-An overview of the default feature labels:
+An overview of the default feature labels or annotations:
 
 ```json
 {
