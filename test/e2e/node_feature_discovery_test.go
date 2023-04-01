@@ -869,7 +869,7 @@ func checkForNodeLabels(cli clientset.Interface, expectedNewLabels map[string]k8
 	return err
 }
 
-// checkForNfdNodeAnnotations waits and checks that node is annotated as expected.
+// checkForNodeAnnotations waits and checks that node is annotated as expected.
 func checkForNodeAnnotations(cli clientset.Interface, expectedNewAnnotations map[string]k8sAnnotations, oldNodes []corev1.Node) error {
 
 	poll := func() error {

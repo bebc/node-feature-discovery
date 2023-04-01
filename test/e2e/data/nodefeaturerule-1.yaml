@@ -75,15 +75,8 @@ spec:
             "attr_1": {op: In, value: ["true"]}
             "attr_3": {op: Lt, value: ["10"]}
 
----
-apiVersion: nfd.k8s-sigs.io/v1alpha1
-kind: NodeFeatureRule
-metadata:
-  name: e2e-test-1
-spec:
-  rules:
-    # Positive test expected to set the annotations
-    - name: "e2e-annotation-test"
+    # simple test rules for expected  annotations
+    - name: "e2e-annotation-test-1"
       annotations:
         defaul-ns-annotation: "foo"
         feature.node.kubernetes.io/defaul-ns-annotation-2: "bar"
@@ -94,19 +87,5 @@ spec:
       matchFeatures:
         - feature: "fake.flag"
           matchExpressions:
-            "flag_1": {op: Exists}
-
-    # Negative test not supposed to set the annotations
-    - name: "e2e-annotation-test-neg"
-        annotations:
-          defaul-ns-annotation: "foo"
-          feature.node.kubernetes.io/defaul-ns-annotation-2: "bar"
-          vendor.example/feature: "baz"
-          kubernetes.io/feature: "denied"
-          subns.kubernetes.io/blah: "denied"
-          nfd.node.kubernetes.io/xyz: "denied"
-        matchFeatures:
-          - feature: "fake.flag"
-            matchExpressions:
-              "flag_1": {op: DoesNotExist}
+            "flag_1": { op: Exists }
 

@@ -113,8 +113,8 @@ Features are divided into three different types:
 ## NodeFeatureRule custom resource
 
 `NodeFeatureRule` objects provide an easy way to create vendor or application
-specific labels and taints. It uses a flexible rule-based mechanism for creating
-labels and optionally taints based on node features.
+specific labels,annotations and taints. It uses a flexible rule-based mechanism
+for creating labels and optionally taints based on node features.
 
 ### A NodeFeatureRule example
 
@@ -130,8 +130,6 @@ spec:
     - name: "my sample rule"
       labels:
         "my-sample-feature": "true"
-      annotations:
-        "my-sample-feature-annotation": "test"
       matchFeatures:
         - feature: kernel.loadedmodule
           matchExpressions:
@@ -141,10 +139,9 @@ spec:
             X86: {op: In, value: ["y"]}
 ```
 
-It specifies one rule which creates node label ande annotations
-`feature.node.kubenernetes.io/my-sample-feature=true` if both of the following
-conditions are true (`matchFeatures` implements a logical AND over the
-matchers):
+It specifies one rule which creates node label
+`feature.node.kubenernetes.io/my-sample-feature=true`  if both of the following
+conditions are true (`matchFeatures` implements a logical AND over the matchers):
 
 - The `dummy` network driver module has been loaded
 - X86 option in kernel config is set to `=y`
@@ -161,6 +158,38 @@ re-labeling delay up to the sleep-interval of nfd-worker (1 minute by default).
 
 See [Label rule format](#label-rule-format) for detailed description of
 available fields and how to write labeling rules.
+
+### NodeFeatureRule annotation feature
+
+Consider the following referential example:
+
+```yaml
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: my-sample-rule-object
+spec:
+  rules:
+    - name: "my sample annotation rule "
+      annotations:
+        "my-sample-feature-annotation": "test"
+      matchFeatures:
+        - feature: kernel.loadedmodule
+          matchExpressions:
+            dummy: {op: Exists}
+        - feature: kernel.config
+          matchExpressions:
+            X86: {op: In, value: ["y"]}
+```
+
+In this example, `feature.node.kubenernetes.io/my-sample-feature-annotation=test`
+annotation are set on the node if both of
+the following conditions are true (`matchFeatures` implements a logical AND over the
+matchers):
+
+- The `dummy` network driver module has been loaded
+- X86 option in kernel config is set to `=y`
+
 ### NodeFeatureRule tainting feature
 
 This feature is experimental.
@@ -477,7 +506,7 @@ details.
 labels specified in the `labels` field will override anything
 originating from `labelsTemplate`.
 
-### Annotations
+#### Annotations
 
 The `.annotations` is a map of the node annotations to create if the rule matches.
 

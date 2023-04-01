@@ -72,12 +72,12 @@ Feature discovery is divided into domain-specific feature sources:
 - Local (hooks for user-specific features)
 
 Each feature source is responsible for detecting a set of features which. in
-turn, are turned into node feature labels and annotations.  Feature labels are prefixed
+turn, are turned into node feature labels.  Feature labels are prefixed
 with `feature.node.kubernetes.io/` and also contain the name of the feature source.
 Non-standard user-specific feature labels can be created with the local and
 custom feature sources.
 
-An overview of the default feature labels or annotations:
+An overview of the default feature labels:
 
 ```json
 {
@@ -98,12 +98,13 @@ An overview of the default feature labels or annotations:
 
 NFD also annotates nodes it is running on:
 
-| Annotation                                                   | Description
-| ------------------------------------------------------------ | -----------
-| [&lt;instance&gt;.]nfd.node.kubernetes.io/master.version     | Version of the nfd-master instance running on the node. Informative use only.
-| [&lt;instance&gt;.]nfd.node.kubernetes.io/worker.version     | Version of the nfd-worker instance running on the node. Informative use only.
-| [&lt;instance&gt;.]nfd.node.kubernetes.io/feature-labels     | Comma-separated list of node labels managed by NFD. NFD uses this internally so must not be edited by users.
-| [&lt;instance&gt;.]nfd.node.kubernetes.io/extended-resources | Comma-separated list of node extended resources managed by NFD. NFD uses this internally so must not be edited by users.
+| Annotation                                                    | Description
+|---------------------------------------------------------------| -----------
+| [&lt;instance&gt;.]nfd.node.kubernetes.io/master.version      | Version of the nfd-master instance running on the node. Informative use only.
+| [&lt;instance&gt;.]nfd.node.kubernetes.io/worker.version      | Version of the nfd-worker instance running on the node. Informative use only.
+| [&lt;instance&gt;.]nfd.node.kubernetes.io/feature-labels      | Comma-separated list of node labels managed by NFD. NFD uses this internally so must not be edited by users.
+| [&lt;instance&gt;.]nfd.node.kubernetes.io/extended-resources  | Comma-separated list of node extended resources managed by NFD. NFD uses this internally so must not be edited by users.
+| [&lt;instance&gt;.]nfd.node.kubernetes.io/feature-annotations | Comma-separated list of node annotations managed by NFD. NFD uses this internally so must not be edited by users.
 
 NOTE: the [`-instance`](../reference/master-commandline-reference.md#instance)
 command line flag affects the annotation names

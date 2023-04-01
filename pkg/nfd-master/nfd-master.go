@@ -52,7 +52,7 @@ import (
 
 const (
 	defaultDenyNs    = "kubernetes.io"
-	defaultDenySubNs = "*.kubernetes.io"
+	defaultDenySubNs = ".kubernetes.io"
 )
 
 // Labels are a Kubernetes representation of discovered features.
@@ -363,7 +363,7 @@ func (m *nfdMaster) prune() error {
 		klog.Infof("pruning node %q...", node.Name)
 
 		// Prune labels and extended resources
-		err := m.updateNodeObject(cli, node.Name, Labels{}, Annotations{}, ExtendedResources{}, []corev1.Taint{})
+		err := m.updateNodeObject(cli, node.Name, Labels{}, Annotations{}, Annotations{}, ExtendedResources{}, []corev1.Taint{})
 		if err != nil {
 			return fmt.Errorf("failed to prune node %q: %v", node.Name, err)
 		}
@@ -463,7 +463,6 @@ func (m *nfdMaster) filterFeatureLabels(labels Labels) (Labels, ExtendedResource
 }
 
 // Filter annotations by namespace. i.e. adds the possibly missing default namespace for annotations
-// arriving through the gRPC API.
 func (m *nfdMaster) filterFeatureAnnotations(annotations map[string]string) map[string]string {
 	outAnnotations := make(map[string]string)
 
@@ -476,7 +475,7 @@ func (m *nfdMaster) filterFeatureAnnotations(annotations map[string]string) map[
 		// Check annotation namespace, filter out if ns is not whitelisted
 		if ns != nfdv1alpha1.FeatureAnnotationNs && !strings.HasSuffix(ns, nfdv1alpha1.FeatureAnnotationSubNsSuffix) {
 			// If the namespace is denied, annotation will be ignored
-			if ns == defaultDenyNs || ns == defaultDenySubNs || ns == nfdv1alpha1.AnnotationNs {
+			if ns == defaultDenyNs || strings.HasSuffix(ns, defaultDenySubNs) || ns == nfdv1alpha1.AnnotationNs {
 				klog.Errorf("Namespace %q is not allowed. Ignoring annotation %q\n", ns, annotation)
 				continue
 			}
@@ -635,13 +634,13 @@ func (m *nfdMaster) nfdAPIUpdateOneNode(nodeName string) error {
 	return nil
 }
 
-func (m *nfdMaster) refreshNodeFeatures(cli *kubernetes.Clientset, nodeName string, annotations, labels map[string]string, features *nfdv1alpha1.Features) error {
+func (m *nfdMaster) refreshNodeFeatures(cli *kubernetes.Clientset, nodeName string, nfdAnnotations, labels map[string]string, features *nfdv1alpha1.Features) error {
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 
-	if annotations == nil {
-		annotations = make(map[string]string)
+	if nfdAnnotations == nil {
+		nfdAnnotations = make(map[string]string)
 	}
 
 	crLabels, crAnnotations, crTaints := m.processNodeFeatureRule(features)
@@ -651,20 +650,16 @@ func (m *nfdMaster) refreshNodeFeatures(cli *kubernetes.Clientset, nodeName stri
 		labels[k] = v
 	}
 
-	for k, v := range crAnnotations {
-		annotations[k] = v
-	}
-
 	labels, extendedResources := m.filterFeatureLabels(labels)
 
-	annotations = m.filterFeatureAnnotations(annotations)
+	featureAnnotations := m.filterFeatureAnnotations(crAnnotations)
 
 	var taints []corev1.Taint
 	if m.args.EnableTaints {
 		taints = crTaints
 	}
 
-	err := m.updateNodeObject(cli, nodeName, labels, annotations, extendedResources, taints)
+	err := m.updateNodeObject(cli, nodeName, labels, nfdAnnotations, featureAnnotations, extendedResources, taints)
 	if err != nil {
 		klog.Errorf("failed to update node %q: %v", nodeName, err)
 		return err
@@ -831,16 +826,9 @@ func (m *nfdMaster) processNodeFeatureRule(features *nfdv1alpha1.Features) (map[
 // updateNodeObject ensures the Kubernetes node object is up to date,
 // creating new labels and extended resources where necessary and removing
 // outdated ones. Also updates the corresponding annotations.
-func (m *nfdMaster) updateNodeObject(cli *kubernetes.Clientset, nodeName string, labels Labels, annotations Annotations, extendedResources ExtendedResources, taints []corev1.Taint) error {
+func (m *nfdMaster) updateNodeObject(cli *kubernetes.Clientset, nodeName string, labels Labels, nfdAnnotations, featureAnnotations Annotations, extendedResources ExtendedResources, taints []corev1.Taint) error {
 	if cli == nil {
 		return fmt.Errorf("no client is passed, client:  %v", cli)
-	}
-
-	//because of the annotations will add label and extendedResource features,
-	//so the deepCopyAnnotations is the copy of annotations for record to NodeFeatureAnnotationsTacking
-	deepCopyAnnotations := make(Annotations)
-	for k, v := range annotations {
-		deepCopyAnnotations[k] = v
 	}
 
 	// Get the worker node object
@@ -856,7 +844,7 @@ func (m *nfdMaster) updateNodeObject(cli *kubernetes.Clientset, nodeName string,
 		labelKeys = append(labelKeys, strings.TrimPrefix(key, nfdv1alpha1.FeatureLabelNs+"/"))
 	}
 	sort.Strings(labelKeys)
-	annotations[m.instanceAnnotation(nfdv1alpha1.FeatureLabelsAnnotation)] = strings.Join(labelKeys, ",")
+	nfdAnnotations[m.instanceAnnotation(nfdv1alpha1.FeatureLabelsAnnotation)] = strings.Join(labelKeys, ",")
 
 	// Store names of extended resources in an annotation
 	extendedResourceKeys := make([]string, 0, len(extendedResources))
@@ -865,23 +853,30 @@ func (m *nfdMaster) updateNodeObject(cli *kubernetes.Clientset, nodeName string,
 		extendedResourceKeys = append(extendedResourceKeys, strings.TrimPrefix(key, nfdv1alpha1.FeatureLabelNs+"/"))
 	}
 	sort.Strings(extendedResourceKeys)
-	annotations[m.instanceAnnotation(nfdv1alpha1.ExtendedResourceAnnotation)] = strings.Join(extendedResourceKeys, ",")
+	nfdAnnotations[m.instanceAnnotation(nfdv1alpha1.ExtendedResourceAnnotation)] = strings.Join(extendedResourceKeys, ",")
 
 	// Store names of annotations in an annotation
-	annotationKeys := make([]string, 0, len(deepCopyAnnotations))
-	for key := range deepCopyAnnotations {
+	annotationKeys := make([]string, 0, len(featureAnnotations))
+	for key := range featureAnnotations {
 		// Drop the ns part for annotations in the default ns
 		annotationKeys = append(annotationKeys, strings.TrimPrefix(key, nfdv1alpha1.FeatureAnnotationNs+"/"))
 	}
 	sort.Strings(annotationKeys)
-	annotations[m.instanceAnnotation(nfdv1alpha1.NodeFeatureAnnotationsTacking)] = strings.Join(annotationKeys, ",")
+	nfdAnnotations[m.instanceAnnotation(nfdv1alpha1.NodeFeatureAnnotation)] = strings.Join(annotationKeys, ",")
+
+	annotations := make(Annotations)
+	for k, v := range nfdAnnotations {
+		annotations[k] = v
+	}
+	for k, v := range featureAnnotations {
+		annotations[k] = v
+	}
 
 	// Create JSON patches for changes in labels and annotations
 	oldLabels := stringToNsNames(node.Annotations[m.instanceAnnotation(nfdv1alpha1.FeatureLabelsAnnotation)], nfdv1alpha1.FeatureLabelNs)
-	oldAnnotations := stringToNsNames(node.Annotations[m.instanceAnnotation(nfdv1alpha1.NodeFeatureAnnotationsTacking)], nfdv1alpha1.FeatureAnnotationNs)
+	oldAnnotations := stringToNsNames(node.Annotations[m.instanceAnnotation(nfdv1alpha1.NodeFeatureAnnotation)], nfdv1alpha1.FeatureAnnotationNs)
 	patches := createPatches(oldLabels, node.Labels, labels, "/metadata/labels")
 	patches = append(patches, createPatches(oldAnnotations, node.Annotations, annotations, "/metadata/annotations")...)
-	//patches = append(patches, createPatches(oldAnnotations, node.Annotations, annotations, "/metadata/annotations")...)
 
 	// Patch the node object in the apiserver
 	err = m.apihelper.PatchNode(cli, node.Name, patches)
